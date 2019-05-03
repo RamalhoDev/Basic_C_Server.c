@@ -1,4 +1,4 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -43,7 +43,7 @@ int main(int argc,char * argv[]){
         puts("ERROR: Client failed to connect");
         exit(1);
     }
-    send(s_fd, "Deu CERTO", 10,  0);
+    send(s_fd, "GET /coco.txt HTTP/1.1", 30,  0);
 
     recv(s_fd, buffer, BUFFERSIZE-1, 0);
     if(buffer != NULL){
