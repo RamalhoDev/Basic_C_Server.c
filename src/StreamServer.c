@@ -38,7 +38,7 @@ char * response_headers(int * status_code, char *file_name, size_t size_of_file)
         size-=strlen(content_type);
         strncat(response, content_type, size-1);
 
-        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg")){
+        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg") || !strcmp(type, "ico")){
             size -=strlen("image/");
             strncat(response, "image/", size-1);    
         }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
@@ -46,7 +46,12 @@ char * response_headers(int * status_code, char *file_name, size_t size_of_file)
             strncat(response, "text/", size - strlen("text/")-1);
         }
         size-=strlen(type);
-        strncat(response, type, size - 1);
+        if(!strcmp(type, "ico")){
+            char ico[7] = "x-";
+            strcat(ico, type);
+            strncat(response, ico, size - 1);
+        }else
+            strncat(response, type, size - 1);
         free(type);
     }
     strncat(response, last, size-1);
