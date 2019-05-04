@@ -14,7 +14,7 @@
 #include <time.h>
 
 #define PORT "8080"
-#define CLIENTS 10
+#define CLIENTS 1000
 #define BUFFERSIZE 1024
 #define OK 200
 #define BAD_REQUEST 400

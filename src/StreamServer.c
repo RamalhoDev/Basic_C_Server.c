@@ -2,89 +2,111 @@
 
 char * get_time(){
     time_t res_time;
-    struct tm *info;
     time(&res_time);
-    info = gmtime(&res_time);
+    struct tm *info = gmtime(&res_time);;
     char * asct = asctime(info);
+    char * response = malloc(sizeof(char)*64);
+    memset(response, 0, 64);
     asct[strlen(asct)-1] = '\0';
+    
     char * week_day = strtok_r(asct, " ", &asct);
     char * month = strtok_r(NULL, " ", &asct);
     char * day = strtok_r(NULL, " ", &asct);
     char * s_time = strtok_r(NULL, " ", &asct);
     char * year = strtok_r(NULL, " ", &asct);
-    char * response = malloc(sizeof(char)*64);
-    strcat(response, week_day);
-    strcat(response, ", ");
-    strcat(response, day);
-    strcat(response, " ");
-    strcat(response, month);
-    strcat(response, " ");
-    strcat(response, year);
-    strcat(response, " ");
-    strcat(response, s_time);
-    strcat(response, " ");
-    strcat(response, "GMT\n");
+
+    snprintf(response, 63, "Date: %s, %s %s %s %s GMT", week_day, day, month, year, s_time);
     
     return response;
 }
 
 char * headers(int status_code, char * file_name, size_t size_of_file){
-    char * response = malloc(sizeof(char) * BUFFERSIZE/2), s_file[32];
-    char * cont_type = "Content-Type: ", *cont_len = "Content-Length: ";
+    int size = BUFFERSIZE/2;
+    char * response = malloc(sizeof(char) * size), s_file[32];
     char * t = get_time();
+    char * last = "\nAccept-Range: bytes\nConnection: closed\n\n";
     response[0] = '\0';
-    strcat(response, "Date: ");
-    strcat(response, t);
-    strcat(response, "Server: rcrServer/1.0\n");
-    strcat(response, cont_len);
     if(status_code == BAD_REQUEST || status_code == NOT_FOUND){
-        snprintf(s_file, 32, "%lu\n", 320);
-        strcat(response, s_file);
-        strcat(response, cont_type);
-            strcat(response, "text/");
-            strcat(response, "html");
+        size -= strlen("230\nContent-Type: text/html");
+        strncat(response, "230\nContent-Type: text/html", size);
     }else{
-        snprintf(s_file, 32, "%lu\n", size_of_file);
-        strcat(response, s_file);
-        const char p = '.';
-        char * aux = strchr(file_name, p);
+        char content_type[64];
+        char * aux = strchr(file_name, '.');
         char * type = malloc(sizeof(char) * 10);
         memcpy(type, &aux[1], strlen(aux));
-        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg"))
-            strcat(response, "image/");    
-        else 
-            if(type != NULL)
-                strcat(response, "text/");
-        strcat(response, type);
+        snprintf(content_type, size, "%lu\nContent_Type: ", size_of_file);
+        size-=strlen(content_type);
+        strncat(response, content_type, size-1);
+
+        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg")){
+            size -=strlen("image/");
+            strncat(response, "image/", size-1);    
+        }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
+            size-=strlen("image/");
+            strncat(response, "text/", size - strlen("text/")-1);
+        }
+        size-=strlen(type);
+        strncat(response, type, size - 1);
         free(type);
     }
-    strcat(response, "\nAccept-Range: bytes");
-    strcat(response, "\nConnection: closed");
-    strcat(response, "\n\n");
+    size -= strlen(last);
+    strncat(response, last, size);
+ 
     return response;
+}
+
+char * response_content(int * status_code, char **file_name){
+    size_t size = 64;
+    char * response = malloc(sizeof(char)* size);
+    response = "\0";
+
+    if(*status_code == BAD_REQUEST || *status_code == NOT_FOUND){
+        strncat(response, "230\nContent-Type: text/html", size);
+    }else{
+        char content_type[64];
+        char * aux = strchr(file_name, '.');
+        char * type = malloc(sizeof(char) * 10);
+        memcpy(type, &aux[1], strlen(aux));
+        snprintf(content_type, size, "%lu\nContent_Type: ", size_of_file);
+        size-=strlen(content_type);
+        strncat(response, content_type, size-1);
+
+        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg")){
+            size -=strlen("image/");
+            strncat(response, "image/", size-1);    
+        }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
+            size-=strlen("image/");
+            strncat(response, "text/", size - strlen("text/")-1);
+        }
+        size-=strlen(type);
+        strncat(response, type, size - 1);
+        free(type);
+    }
+}
+
+char * response_status(int * status_code){
+    switch(*status_code){
+        case  OK:
+            return HTTP_OK;
+        case BAD_REQUEST:
+            return BAD_REQUEST;
+        case NOT_FOUND:
+            return NOT_FOUND;
+    }
 }
 
 char * create_response(int status_code, char * file_name, size_t size_of_file){
     char * response = malloc(sizeof(char) * BUFFERSIZE);
     response[0]= '\0';
-    char * header;
-    switch(status_code){
-        case  OK:
-            strcat(response, HTTP_OK);
-            header = headers(status_code,file_name, size_of_file);
-            strcat(response, header);
-            break;
-        case BAD_REQUEST:
-            strcat(response ,HTTP_BAD_REQUEST);
-            header = headers(status_code,file_name, size_of_file);
-            strcat(response, header);
-            break;
-        case NOT_FOUND:
-            strcat(response, HTTP_NOT_FOUND);
-            header = headers(status_code,file_name, size_of_file);
-            strcat(response, header);
-            break;
-    }
+    char * http_status = response_status;
+    char * date = get_time();
+    header = headers(status_code,file_name, size_of_file);
+    snprintf(response, BUFFERSIZE, "%s%s", HTTP_OK, header);
+    header = headers(status_code,file_name, size_of_file);
+    snprintf(response, BUFFERSIZE, "%s%s", HTTP_BAD_REQUEST, header);
+    header = headers(status_code,file_name, size_of_file);
+    snprintf(response, BUFFERSIZE, "%s%s", HTTP_NOT_FOUND, header);
+
     free(header);
     return response;
 }
@@ -135,30 +157,31 @@ void * get_sockaddr(struct sockaddr * s){
 }
 
 void process_requests(tInfo *info){
-        FILE * file;
-        char *file_name = NULL, *response = NULL;
-        char buffer[BUFFERSIZE] = '\0';
-        int status_code = 0;
-        size_t size_of_file = 0;
-        sem_t sm;
-        sem_init(&sm, 0, 1);
+    FILE * file;
+    char *file_name = NULL;
+    char *response = NULL;
+    char buffer[BUFFERSIZE] = "\0";
+    int status_code = 0;
+    size_t size_of_file = 0;
+    sem_t sm;
+    sem_init(&sm, 0, 1);
 
-        if(recv(info->client_fd, buffer, BUFFERSIZE-1, 0) == -1){
-            puts("ERROR: Couldn't receive package");
-        }
-        if(buffer[0] != 'G')
+    if(recv(info->client_fd, buffer, BUFFERSIZE-1, 0) == -1){
+        puts("ERROR: Couldn't receive package");
+    } 
+
+    if(!(buffer[0]=='\0')){
+        if(buffer[0] != 'G' ){
             status_code = BAD_REQUEST;
+        }
         else
             file_name = process_buffer(&buffer);
         file = process_response(file_name, &status_code, &size_of_file);
         char * file_content = malloc(sizeof(char) * (size_of_file+1));
 
-        sem_wait(&sm);
-        write_log(buffer, info->addr);
-        sem_post(&sm);
-
         response = create_response(status_code, file_name ,size_of_file);
-        if(send(info->client_fd, response, strlen(response)+1, 0) == -1){
+        puts(response);
+        if(send(info->client_fd, response, strlen(response), 0) == -1){
             puts("ERROR: Couldn't send response");
         }
         fread(file_content, 1, size_of_file, file);
@@ -166,13 +189,19 @@ void process_requests(tInfo *info){
             puts("ERROR: Couldn't send response");
         }
 
+        sem_wait(&sm);
+        write_log(buffer, info->addr);
+        sem_post(&sm);
+
         close(info->client_fd);
         fclose(file);
         free(file_content);
         free(response);
         free(file_name);
         sem_destroy(&sm);
-}
+    }
+    close(info->client_fd);
+} 
 
 void handle_clients(int s_fd){
     pthread_t clients[CLIENTS];
@@ -198,10 +227,7 @@ void handle_clients(int s_fd){
         if(err_check){
             exit(1);
         }
-        count++;
-        if(count == 10){
-            break;
-        }
+        count++;    
     }
 }
 
