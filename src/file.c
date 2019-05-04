@@ -9,14 +9,17 @@ size_t size_of_file(FILE * file){
 
 FILE * process_response(char * file_name, int * status_code, size_t * s_file){
     char aux[64] = "./files/";
-    strcat(aux, file_name);
+    if(file_name != NULL)
+        strcat(aux, file_name);
+
     if(*status_code == BAD_REQUEST){
         FILE *file = fopen("./files/BAD_REQUEST.html", "rb");
         *s_file = size_of_file(file);
-        *status_code = NOT_FOUND;
+        *status_code = BAD_REQUEST;
         return file;        
     }
-    FILE *file = fopen(file_name, "rb");
+
+    FILE *file = fopen(aux, "rb");
     if(file != NULL){
         *s_file = size_of_file(file);
         *status_code = OK;
@@ -27,4 +30,11 @@ FILE * process_response(char * file_name, int * status_code, size_t * s_file){
         *status_code = NOT_FOUND;
         return file;
     }
+}
+
+void write_log(char * buffer, char * c_addr){
+    FILE * LOG = fopen("./log.txt", "a+");
+    fprintf(LOG, "IP: %s\n", c_addr);
+    fprintf(LOG, "%s", buffer);
+    fclose(LOG);
 }
