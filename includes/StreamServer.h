@@ -34,7 +34,7 @@ void setup_server(struct addrinfo * server, int * s_fd);
 void run_server(int s_fd);
 char * process_buffer(char ** buffer);
 void process_requests(tInfo *log);
-char * headers(int status_code,char * type, size_t size_of_file);
 char * create_response(int status_code, char * file_name, size_t size_of_file);
 void * get_sockaddr(struct sockaddr * s);
+char * response_headers(int * status_code, char *file_name, size_t size_of_file);
 #endif

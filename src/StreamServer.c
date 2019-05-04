@@ -15,26 +15,26 @@ char * get_time(){
     char * s_time = strtok_r(NULL, " ", &asct);
     char * year = strtok_r(NULL, " ", &asct);
 
-    snprintf(response, 63, "Date: %s, %s %s %s %s GMT", week_day, day, month, year, s_time);
+    snprintf(response, 63, "Date: %s, %s %s %s %s GMT\n", week_day, day, month, year, s_time);
     
     return response;
 }
 
-char * headers(int status_code, char * file_name, size_t size_of_file){
-    int size = BUFFERSIZE/2;
-    char * response = malloc(sizeof(char) * size), s_file[32];
-    char * t = get_time();
-    char * last = "\nAccept-Range: bytes\nConnection: closed\n\n";
+char * response_headers(int * status_code, char *file_name, size_t size_of_file){
+    size_t size = BUFFERSIZE/2;
+    char * last = "\nAccept-Range: bytes\nConnection: closed";
+    char * response = malloc(sizeof(char) * size);
     response[0] = '\0';
-    if(status_code == BAD_REQUEST || status_code == NOT_FOUND){
-        size -= strlen("230\nContent-Type: text/html");
-        strncat(response, "230\nContent-Type: text/html", size);
+
+    if(*status_code == BAD_REQUEST || *status_code == NOT_FOUND){
+        strncat(response, "Content-Length: 230\nContent-Type: text/html", size-1);
+        size -= strlen(response);
     }else{
         char content_type[64];
         char * aux = strchr(file_name, '.');
         char * type = malloc(sizeof(char) * 10);
         memcpy(type, &aux[1], strlen(aux));
-        snprintf(content_type, size, "%lu\nContent_Type: ", size_of_file);
+        snprintf(content_type, size, "Content-Length: %lu\nContent_Type: ", size_of_file);
         size-=strlen(content_type);
         strncat(response, content_type, size-1);
 
@@ -49,64 +49,30 @@ char * headers(int status_code, char * file_name, size_t size_of_file){
         strncat(response, type, size - 1);
         free(type);
     }
-    size -= strlen(last);
-    strncat(response, last, size);
- 
+    strncat(response, last, size-1);
     return response;
 }
 
-char * response_content(int * status_code, char **file_name){
-    size_t size = 64;
-    char * response = malloc(sizeof(char)* size);
-    response = "\0";
-
-    if(*status_code == BAD_REQUEST || *status_code == NOT_FOUND){
-        strncat(response, "230\nContent-Type: text/html", size);
-    }else{
-        char content_type[64];
-        char * aux = strchr(file_name, '.');
-        char * type = malloc(sizeof(char) * 10);
-        memcpy(type, &aux[1], strlen(aux));
-        snprintf(content_type, size, "%lu\nContent_Type: ", size_of_file);
-        size-=strlen(content_type);
-        strncat(response, content_type, size-1);
-
-        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg")){
-            size -=strlen("image/");
-            strncat(response, "image/", size-1);    
-        }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
-            size-=strlen("image/");
-            strncat(response, "text/", size - strlen("text/")-1);
-        }
-        size-=strlen(type);
-        strncat(response, type, size - 1);
-        free(type);
-    }
-}
-
-char * response_status(int * status_code){
-    switch(*status_code){
+char * response_status(int status_code){
+    switch(status_code){
         case  OK:
             return HTTP_OK;
         case BAD_REQUEST:
-            return BAD_REQUEST;
+            return HTTP_BAD_REQUEST;
         case NOT_FOUND:
-            return NOT_FOUND;
+            return HTTP_NOT_FOUND;
     }
 }
 
 char * create_response(int status_code, char * file_name, size_t size_of_file){
     char * response = malloc(sizeof(char) * BUFFERSIZE);
     response[0]= '\0';
-    char * http_status = response_status;
     char * date = get_time();
-    header = headers(status_code,file_name, size_of_file);
-    snprintf(response, BUFFERSIZE, "%s%s", HTTP_OK, header);
-    header = headers(status_code,file_name, size_of_file);
-    snprintf(response, BUFFERSIZE, "%s%s", HTTP_BAD_REQUEST, header);
-    header = headers(status_code,file_name, size_of_file);
-    snprintf(response, BUFFERSIZE, "%s%s", HTTP_NOT_FOUND, header);
-
+    char * header = response_headers(&status_code, file_name, size_of_file);
+    char * r_status = response_status(status_code);
+    snprintf(response, BUFFERSIZE, "%s%s%s\n\n", r_status, date, header);
+    
+    free(date);
     free(header);
     return response;
 }
