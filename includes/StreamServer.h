@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <time.h>
+#include <fcntl.h>
 
 #define PORT "8080"
 #define CLIENTS 1000

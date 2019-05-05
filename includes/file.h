@@ -9,7 +9,7 @@
 #define BAD_REQUEST 400
 
 size_t size_of_file(FILE * file);
-FILE * process_response(char * file_name, int * status_code, size_t *s_file);
+FILE * process_response(char ** file_name, int * status_code, size_t *s_file);
 void write_log(char * buffer, char * c_addr);
 
 #endif

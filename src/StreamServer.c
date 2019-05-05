@@ -25,35 +25,31 @@ char * response_headers(int * status_code, char *file_name, size_t size_of_file)
     char * last = "\nAccept-Range: bytes\nConnection: closed";
     char * response = malloc(sizeof(char) * size);
     response[0] = '\0';
+    char content_type[64];
+    char * aux = strchr(file_name, '.');
+    char * type = malloc(sizeof(char) * 10);
+    memcpy(type, &aux[1], strlen(aux));
+    
+    snprintf(content_type, size-1, "Content-Length: %lu\nContent_Type: ", size_of_file);
+    size-=strlen(content_type);
+    strncat(response, content_type, size-1);
 
-    if(*status_code == BAD_REQUEST || *status_code == NOT_FOUND){
-        strncat(response, "Content-Length: 230\nContent-Type: text/html", size-1);
-        size -= strlen(response);
-    }else{
-        char content_type[64];
-        char * aux = strchr(file_name, '.');
-        char * type = malloc(sizeof(char) * 10);
-        memcpy(type, &aux[1], strlen(aux));
-        snprintf(content_type, size, "Content-Length: %lu\nContent_Type: ", size_of_file);
-        size-=strlen(content_type);
-        strncat(response, content_type, size-1);
-
-        if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg") || !strcmp(type, "ico")){
-            size -=strlen("image/");
-            strncat(response, "image/", size-1);    
-        }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
-            size-=strlen("image/");
-            strncat(response, "text/", size - strlen("text/")-1);
-        }
-        size-=strlen(type);
-        if(!strcmp(type, "ico")){
-            char ico[7] = "x-";
-            strcat(ico, type);
-            strncat(response, ico, size - 1);
-        }else
-            strncat(response, type, size - 1);
-        free(type);
+    if(!strcmp(type, "png") || !strcmp(type, "jpg") || !strcmp(type, "jpeg") || !strcmp(type, "ico")){
+        size -=strlen("image/");
+        strncat(response, "image/", size-1);    
+    }else if(!strcmp(type, "html") || !strcmp(type, "txt")){
+        size-=strlen("image/");
+        strncat(response, "text/", size - strlen("text/")-1);
     }
+    size-=strlen(type);
+    if(!strcmp(type, "ico")){
+        char ico[7] = "x-";
+        strcat(ico, type);
+        strncat(response, ico, size - 1);
+    }else
+        strncat(response, type, size - 1);
+    free(type);
+
     strncat(response, last, size-1);
     return response;
 }
@@ -129,7 +125,7 @@ void * get_sockaddr(struct sockaddr * s){
 
 void process_requests(tInfo *info){
     FILE * file;
-    char *file_name = NULL;
+    char *file_name = malloc(sizeof(char) * 64);
     char *response = NULL;
     char buffer[BUFFERSIZE] = "\0";
     int status_code = 0;
@@ -141,36 +137,34 @@ void process_requests(tInfo *info){
         puts("ERROR: Couldn't receive package");
     } 
 
-    if(!(buffer[0]=='\0')){
-        if(buffer[0] != 'G' ){
-            status_code = BAD_REQUEST;
-        }
-        else
-            file_name = process_buffer(&buffer);
-        file = process_response(file_name, &status_code, &size_of_file);
-        char * file_content = malloc(sizeof(char) * (size_of_file+1));
-
-        response = create_response(status_code, file_name ,size_of_file);
-        puts(response);
-        if(send(info->client_fd, response, strlen(response), 0) == -1){
-            puts("ERROR: Couldn't send response");
-        }
-        fread(file_content, 1, size_of_file, file);
-        if(send(info->client_fd, file_content, size_of_file, 0) == -1){
-            puts("ERROR: Couldn't send response");
-        }
-
-        sem_wait(&sm);
-        write_log(buffer, info->addr);
-        sem_post(&sm);
-
-        close(info->client_fd);
-        fclose(file);
-        free(file_content);
-        free(response);
-        free(file_name);
-        sem_destroy(&sm);
+    // fcntl(info->client_fd, F_SETFL, O);
+    if(buffer[0] != 'G'){
+        status_code = BAD_REQUEST;
     }
+    else
+        file_name = process_buffer(&buffer);
+
+    file = process_response(&file_name, &status_code, &size_of_file);
+    char * file_content = malloc(sizeof(char) * (size_of_file+1));
+    response = create_response(status_code, file_name ,size_of_file);
+    puts(response);
+    if(send(info->client_fd, response, strlen(response), 0) == -1){
+        puts("ERROR: Couldn't send response");
+    }
+    fread(file_content, 1, size_of_file, file);
+    if(send(info->client_fd, file_content, size_of_file, 0) == -1){
+        puts("ERROR: Couldn't send response");
+    }
+
+    sem_wait(&sm);
+    write_log(buffer, info->addr);
+    sem_post(&sm);
+
+    fclose(file);
+    free(file_content);
+    free(response);
+    free(file_name);
+    sem_destroy(&sm);
     close(info->client_fd);
 } 
 
