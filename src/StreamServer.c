@@ -22,15 +22,15 @@ char * get_time(){
 
 char * response_headers(int * status_code, char *file_name, size_t size_of_file){
     size_t size = BUFFERSIZE/2;
-    char * last = "\nAccept-Range: bytes\nConnection: closed";
+    char * last = "\nConnection: closed";
     char * response = malloc(sizeof(char) * size);
     response[0] = '\0';
-    char content_type[64];
+    char content_type[BUFFERSIZE/2];
     char * aux = strchr(file_name, '.');
     char * type = malloc(sizeof(char) * 10);
     memcpy(type, &aux[1], strlen(aux));
     
-    snprintf(content_type, size-1, "Content-Length: %lu\nContent_Type: ", size_of_file);
+    snprintf(content_type, size-1, "Server: rcrServer\nAccept-Ranges: bytes\nContent-Length: %lu\nContent_Type: ", size_of_file);
     size-=strlen(content_type);
     strncat(response, content_type, size-1);
 
@@ -127,45 +127,47 @@ void process_requests(tInfo *info){
     FILE * file;
     char *file_name = malloc(sizeof(char) * 64);
     char *response = NULL;
-    char buffer[BUFFERSIZE] = "\0";
-    int status_code = 0;
+    char * buffer = malloc(sizeof(char) * BUFFERSIZE);
+    memset(buffer, 0, BUFFERSIZE);
     size_t size_of_file = 0;
-    sem_t sm;
-    sem_init(&sm, 0, 1);
-
-    if(recv(info->client_fd, buffer, BUFFERSIZE-1, 0) == -1){
+    int status_code = 0;
+    int aux = recv(info->client_fd, buffer, BUFFERSIZE-1, 0);
+    if(aux == -1){
         puts("ERROR: Couldn't receive package");
-    } 
-
-    // fcntl(info->client_fd, F_SETFL, O);
-    if(buffer[0] != 'G'){
-        status_code = BAD_REQUEST;
+    }else if(aux == 0){
+        puts("Remote side disconnected\n");
+        pthread_exit(-1);
     }
-    else
-        file_name = process_buffer(&buffer);
+    
+    sem_wait(info->sm);
+    write_log(buffer, info->addr);
+    sem_post(info->sm);
 
+    if(buffer[0] != 'G')
+        status_code = BAD_REQUEST;
+    else{
+        free(file_name);
+        file_name = process_buffer(buffer);
+    }
     file = process_response(&file_name, &status_code, &size_of_file);
     char * file_content = malloc(sizeof(char) * (size_of_file+1));
+    fread(file_content, 1, size_of_file, file);
+    fclose(file);
     response = create_response(status_code, file_name ,size_of_file);
-    puts(response);
+
     if(send(info->client_fd, response, strlen(response), 0) == -1){
         puts("ERROR: Couldn't send response");
     }
-    fread(file_content, 1, size_of_file, file);
     if(send(info->client_fd, file_content, size_of_file, 0) == -1){
         puts("ERROR: Couldn't send response");
     }
-
-    sem_wait(&sm);
-    write_log(buffer, info->addr);
-    sem_post(&sm);
-
-    fclose(file);
+    free(buffer);
     free(file_content);
     free(response);
     free(file_name);
-    sem_destroy(&sm);
+    sem_destroy(info->sm);
     close(info->client_fd);
+    pthread_exit(-1);
 } 
 
 void handle_clients(int s_fd){
@@ -175,8 +177,12 @@ void handle_clients(int s_fd){
     int c_fd, count = 0, err_check;
     char client_addr[INET6_ADDRSTRLEN];
     tInfo info;
-    
+    sem_t sm;
+    sem_init(&sm, 0, 1);
+
     while(1){
+        if(count == CLIENTS)
+            count = 0;
         c_fd = accept(s_fd, (struct sockaddr *) &client, &c_size);
         if( c_fd == -1){
             puts("ERROR: Connection to client failed");
@@ -184,10 +190,11 @@ void handle_clients(int s_fd){
         }
 
         inet_ntop(client.ss_family, get_sockaddr((struct sockaddr *)&client) ,client_addr, sizeof(client_addr));
-        
+
         info.client_fd = c_fd;
         info.addr = client_addr;
-
+        info.sm = &sm;
+        
         err_check = pthread_create(&clients[count], NULL, process_requests, &info);
         if(err_check){
             exit(1);

@@ -27,12 +27,12 @@
 typedef struct{
     char * addr;
     int client_fd;
+    sem_t * sm;
 }tInfo;
-
+void run_server(int s_fd);
 int find_open_port(struct addrinfo * list, struct addrinfo * server);
 void handle_clients(int s_fd);
 void setup_server(struct addrinfo * server, int * s_fd);
-void run_server(int s_fd);
 char * process_buffer(char ** buffer);
 void process_requests(tInfo *log);
 char * create_response(int status_code, char * file_name, size_t size_of_file);
